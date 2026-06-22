@@ -1,0 +1,5 @@
+numpy>=1.26
+pymodbus>=3.6
+dash>=2.16
+plotly>=5.20
+pytest>=8.0

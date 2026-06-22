@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+
+  # ── OpenPLC Runtime ──────────────────────────────────────────────────────────
+  # The open-source IEC 61131-3 PLC runtime that runs our Structured Text program.
+  # Web UI on port 8080; Modbus slave on port 502 (reads from our bridge).
+  openplc:
+    image: openplc/openplc_v3:latest
+    container_name: openplc
+    ports:
+      - "8080:8080"    # Web management UI
+      - "502:502"      # Modbus TCP (internal slave — PLC reads our bridge)
+    volumes:
+      - ../plc:/workdir/plc:ro          # ST source files
+      - openplc_data:/workdir/db        # persistent SQLite database
+    environment:
+      - OPENPLC_PORT=8080
+    restart: unless-stopped
+    networks:
+      - plc_net
+
+  # ── EKF + Modbus bridge service ──────────────────────────────────────────────
+  ekf_bridge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ekf
+    container_name: ekf_bridge
+    ports:
+      - "5020:5020"    # Modbus TCP server (non-root port; OpenPLC connects here)
+    restart: unless-stopped
+    networks:
+      - plc_net
+    depends_on:
+      - openplc
+
+  # ── Dash dashboard ───────────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: dashboard
+    ports:
+      - "8050:8050"
+    restart: unless-stopped
+    networks:
+      - plc_net
+    depends_on:
+      - ekf_bridge
+
+volumes:
+  openplc_data:
+
+networks:
+  plc_net:
+    driver: bridge
